@@ -1,0 +1,225 @@
+/* ============================================================
+   Varsaflow.ai — Shopify Chat Widget (CDN build)
+   Embed with a single script tag, e.g.:
+
+   <script
+     src="https://cdn.jsdelivr.net/gh/YOUR_USER/YOUR_REPO@v1.0.0/varsaflow-widget.js"
+     data-webhook="https://your-real-webhook-url.com/webhook"
+     defer>
+   </script>
+
+   The data-webhook attribute lets each store point at its own
+   webhook without editing this file. If it's omitted, the
+   DEFAULT_WEBHOOK_URL below is used instead.
+============================================================= */
+(function () {
+  "use strict";
+
+  // Prevent double-injection if the script is included twice
+  if (document.getElementById("varsaflow-chat-widget")) return;
+
+  // Grab a reference to this <script> tag synchronously (works with defer/async
+  // as long as it's read here, before any async work happens)
+  var scriptTag = document.currentScript;
+  var DEFAULT_WEBHOOK_URL = "https://harshjot717.app.n8n.cloud/webhook-test/caf4f8c2-8b16-4d1b-869a-0b75982b372e";
+  var WEBHOOK_URL = (scriptTag && scriptTag.getAttribute("data-webhook")) || DEFAULT_WEBHOOK_URL;
+  var ICON_URL = (scriptTag && scriptTag.getAttribute("data-icon")) || "https://i.ibb.co/1YH0F6F0/image-5.png";
+
+  // ---------------- CSS ----------------
+  var css = "\
+#varsaflow-chat-widget, #varsaflow-chat-widget * { box-sizing: border-box; }\
+#varsaflow-chat-widget {\
+  --vf-navy-900: #0d1526; --vf-navy-800: #142238; --vf-blue: #3d6ee0; --vf-teal: #17c6c6;\
+  --vf-ink: #16213e; --vf-bg-soft: #f5f7fb; --vf-border: #e4e8f1; --vf-text: #1c2333; --vf-text-mute: #7c869c;\
+  position: fixed; bottom: 20px; right: 20px; z-index: 999999;\
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;\
+}\
+.vf-bubble-btn { width:58px; height:58px; border-radius:50%; border:none; cursor:pointer; padding:0; outline:none;\
+  background: linear-gradient(135deg, var(--vf-navy-900) 0%, var(--vf-ink) 100%);\
+  display:flex; align-items:center; justify-content:center; box-shadow:0 8px 24px rgba(13,21,38,0.35);\
+  transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s ease; }\
+.vf-bubble-btn:hover { transform: scale(1.06); box-shadow: 0 10px 28px rgba(13,21,38,0.45); }\
+.vf-bubble-btn:active { transform: scale(0.94); }\
+.vf-bubble-icon { width:34px; height:34px; object-fit:contain; border-radius:50%; }\
+.vf-window { position:absolute; bottom:74px; right:0; width:360px; height:520px; max-height:75vh;\
+  background:#ffffff; border-radius:18px; box-shadow:0 16px 48px rgba(13,21,38,0.22), 0 4px 14px rgba(13,21,38,0.1);\
+  display:flex; flex-direction:column; overflow:hidden; transform-origin:bottom right;\
+  animation: vf-pop 0.28s cubic-bezier(0.34,1.56,0.64,1); }\
+@keyframes vf-pop { from { opacity:0; transform: translateY(16px) scale(0.96); } to { opacity:1; transform: translateY(0) scale(1); } }\
+.hidden { display:none !important; }\
+.vf-header { background: linear-gradient(135deg, var(--vf-navy-900) 0%, var(--vf-ink) 60%, #0f3460 100%);\
+  padding:14px 16px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }\
+.vf-header-left { display:flex; align-items:center; gap:10px; min-width:0; }\
+.vf-header-mark { width:34px; height:34px; border-radius:9px; object-fit:contain; background: rgba(255,255,255,0.04); flex-shrink:0; }\
+.vf-header-text { display:flex; flex-direction:column; min-width:0; }\
+.vf-header-name { color:#ffffff; font-size:15px; font-weight:600; letter-spacing:0.1px; line-height:1.2; }\
+.vf-header-status { display:flex; align-items:center; gap:5px; font-size:11.5px; color:#a9b4cc; line-height:1.4; }\
+.vf-header-status i { width:6px; height:6px; border-radius:50%; background:#2ee6a6; display:inline-block; box-shadow:0 0 0 3px rgba(46,230,166,0.18); }\
+.vf-close-btn { background:none; border:none; color:#c3cbdb; cursor:pointer; width:30px; height:30px; border-radius:8px;\
+  display:flex; align-items:center; justify-content:center; flex-shrink:0; transition: background 0.2s ease, color 0.2s ease; }\
+.vf-close-btn:hover { background: rgba(255,255,255,0.08); color:#ffffff; }\
+.vf-messages { flex:1; overflow-y:auto; padding:16px 14px; display:flex; flex-direction:column; gap:12px; background: var(--vf-bg-soft); }\
+.vf-messages::-webkit-scrollbar { width:5px; }\
+.vf-messages::-webkit-scrollbar-track { background: transparent; }\
+.vf-messages::-webkit-scrollbar-thumb { background:#cfd6e4; border-radius:3px; }\
+.vf-message { display:flex; align-items:flex-end; gap:8px; max-width:100%; animation: vf-fade-in 0.25s ease-out; }\
+@keyframes vf-fade-in { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform: translateY(0); } }\
+.vf-avatar { width:22px; height:22px; border-radius:50%; object-fit:contain; background: var(--vf-navy-900); flex-shrink:0; }\
+.vf-bubble { max-width:78%; padding:10px 13px; border-radius:14px; font-size:13.5px; line-height:1.45; word-wrap:break-word; }\
+.vf-bot .vf-bubble { background:#ffffff; color: var(--vf-text); border:1px solid var(--vf-border); border-bottom-left-radius:4px; }\
+.vf-user { justify-content:flex-end; }\
+.vf-user .vf-bubble { background: linear-gradient(135deg, var(--vf-blue) 0%, var(--vf-teal) 100%); color:#ffffff; border-bottom-right-radius:4px; }\
+.vf-typing { display:flex; align-items:flex-end; gap:8px; padding:0 14px 8px; }\
+.vf-typing-bubble { display:flex; align-items:center; gap:4px; padding:11px 14px; }\
+.vf-typing-bubble span { width:6px; height:6px; border-radius:50%; background:#b7c0d4; animation: vf-bounce 1.2s infinite ease-in-out; }\
+.vf-typing-bubble span:nth-child(2) { animation-delay:0.15s; }\
+.vf-typing-bubble span:nth-child(3) { animation-delay:0.3s; }\
+@keyframes vf-bounce { 0%,60%,100% { transform: translateY(0); opacity:0.5; } 30% { transform: translateY(-4px); opacity:1; } }\
+.vf-input-area { display:flex; align-items:center; gap:8px; padding:12px; background:#ffffff; border-top:1px solid var(--vf-border); flex-shrink:0; }\
+.vf-input { flex:1; border:1px solid var(--vf-border); border-radius:22px; padding:10px 15px; font-size:13.5px; outline:none;\
+  font-family:inherit; color: var(--vf-text); background: var(--vf-bg-soft); transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease; }\
+.vf-input:focus { border-color: var(--vf-blue); background:#ffffff; box-shadow: 0 0 0 3px rgba(61,110,224,0.12); }\
+.vf-input::placeholder { color: var(--vf-text-mute); }\
+.vf-send-btn { width:38px; height:38px; border-radius:50%; border:none; background: linear-gradient(135deg, var(--vf-blue) 0%, var(--vf-teal) 100%);\
+  color:#ffffff; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0;\
+  transition: transform 0.15s ease, box-shadow 0.15s ease; box-shadow: 0 3px 10px rgba(61,110,224,0.3); }\
+.vf-send-btn:hover { transform: scale(1.06); }\
+.vf-send-btn:active { transform: scale(0.92); }\
+.vf-send-btn:disabled { opacity:0.5; cursor:default; transform:none; }\
+.vf-footer { text-align:center; font-size:10.5px; color: var(--vf-text-mute); padding:6px 0 10px; background:#ffffff; flex-shrink:0; }\
+.vf-footer strong { color:#4a5a7a; }\
+@media (max-width: 480px) {\
+  #varsaflow-chat-widget { bottom:14px; right:14px; }\
+  .vf-window { width: calc(100vw - 24px); height: min(72vh, 560px); bottom:70px; right:-6px; }\
+  .vf-bubble-btn { width:54px; height:54px; }\
+}";
+
+  var styleEl = document.createElement("style");
+  styleEl.id = "varsaflow-widget-styles";
+  styleEl.textContent = css;
+  document.head.appendChild(styleEl);
+
+  // ---------------- HTML ----------------
+  var wrapper = document.createElement("div");
+  wrapper.id = "varsaflow-chat-widget";
+  wrapper.innerHTML =
+    '<button id="varsaflow-chat-bubble" class="vf-bubble-btn" aria-label="Open chat">' +
+      '<img src="' + ICON_URL + '" alt="" class="vf-bubble-icon">' +
+    '</button>' +
+    '<div id="varsaflow-chat-window" class="vf-window hidden" role="dialog" aria-label="Varsaflow chat">' +
+      '<div class="vf-header">' +
+        '<div class="vf-header-left">' +
+          '<img src="' + ICON_URL + '" alt="" class="vf-header-mark">' +
+          '<div class="vf-header-text">' +
+            '<span class="vf-header-name">Varsaflow</span>' +
+            '<span class="vf-header-status"><i></i>Online</span>' +
+          '</div>' +
+        '</div>' +
+        '<button id="varsaflow-close-btn" class="vf-close-btn" aria-label="Close chat">' +
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' +
+            '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>' +
+          '</svg>' +
+        '</button>' +
+      '</div>' +
+      '<div id="varsaflow-chat-messages" class="vf-messages">' +
+        '<div class="vf-message vf-bot">' +
+          '<img src="' + ICON_URL + '" alt="" class="vf-avatar">' +
+          '<div class="vf-bubble">Hi there \uD83D\uDC4B Welcome to Varsaflow. How can I help you today?</div>' +
+        '</div>' +
+      '</div>' +
+      '<div id="varsaflow-typing" class="vf-typing hidden">' +
+        '<img src="' + ICON_URL + '" alt="" class="vf-avatar">' +
+        '<div class="vf-bubble vf-typing-bubble"><span></span><span></span><span></span></div>' +
+      '</div>' +
+      '<div class="vf-input-area">' +
+        '<input type="text" id="varsaflow-input" class="vf-input" placeholder="Type your message\u2026" autocomplete="off" maxlength="500">' +
+        '<button id="varsaflow-send-btn" class="vf-send-btn" aria-label="Send message">' +
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline>' +
+          '</svg>' +
+        '</button>' +
+      '</div>' +
+      '<div class="vf-footer">Powered by <strong>Varsaflow.ai</strong></div>' +
+    '</div>';
+
+  document.body.appendChild(wrapper);
+
+  // ---------------- Behavior ----------------
+  var bubble = document.getElementById("varsaflow-chat-bubble");
+  var win = document.getElementById("varsaflow-chat-window");
+  var closeBtn = document.getElementById("varsaflow-close-btn");
+  var input = document.getElementById("varsaflow-input");
+  var sendBtn = document.getElementById("varsaflow-send-btn");
+  var messages = document.getElementById("varsaflow-chat-messages");
+  var typingIndicator = document.getElementById("varsaflow-typing");
+
+  bubble.addEventListener("click", function () {
+    win.classList.toggle("hidden");
+    if (!win.classList.contains("hidden")) input.focus();
+  });
+
+  closeBtn.addEventListener("click", function () {
+    win.classList.add("hidden");
+  });
+
+  sendBtn.addEventListener("click", sendMessage);
+  input.addEventListener("keypress", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  function addMessage(text, sender) {
+    var row = document.createElement("div");
+    row.className = "vf-message " + (sender === "user" ? "vf-user" : "vf-bot");
+    var bubbleHtml = '<div class="vf-bubble"></div>';
+    if (sender === "bot") {
+      row.innerHTML = '<img src="' + ICON_URL + '" alt="" class="vf-avatar">' + bubbleHtml;
+    } else {
+      row.innerHTML = bubbleHtml;
+    }
+    row.querySelector(".vf-bubble").textContent = text;
+    messages.appendChild(row);
+    scrollToBottom();
+  }
+
+  function showTyping(show) {
+    typingIndicator.classList.toggle("hidden", !show);
+    scrollToBottom();
+  }
+
+  function scrollToBottom() {
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  function sendMessage() {
+    var text = input.value.trim();
+    if (!text) return;
+
+    addMessage(text, "user");
+    input.value = "";
+    input.focus();
+    sendBtn.disabled = true;
+    showTyping(true);
+
+    var params = new URLSearchParams({
+      message: text,
+      timestamp: new Date().toISOString()
+    });
+
+    fetch(WEBHOOK_URL + "?" + params.toString(), { method: "GET" })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        showTyping(false);
+        addMessage(data.reply || "Thanks for your message! We'll get back to you soon.", "bot");
+      })
+      .catch(function () {
+        showTyping(false);
+        addMessage("Sorry, something went wrong. Please try again in a moment.", "bot");
+      })
+      .finally(function () {
+        sendBtn.disabled = false;
+      });
+  }
+})();
